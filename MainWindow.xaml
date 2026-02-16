@@ -1,0 +1,245 @@
+﻿<Window x:Class="WpfApp1.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Robotin tilan seuranta" Height="760" Width="1500"
+        Background="#0B0B0F" WindowStartupLocation="CenterScreen">
+
+    <Window.Resources>
+        <SolidColorBrush x:Key="GlassBorderBrush" Color="#33FFFFFF"/>
+        <SolidColorBrush x:Key="GlassFillBrush"   Color="#14FFFFFF"/>
+        <SolidColorBrush x:Key="CardFillBrush"    Color="#1BFFFFFF"/>
+
+        <SolidColorBrush x:Key="TextPrimaryBrush"   Color="#F2F2F7"/>
+        <SolidColorBrush x:Key="TextSecondaryBrush" Color="#B3B3C2"/>
+
+        <DropShadowEffect x:Key="SoftShadow" BlurRadius="24" ShadowDepth="0" Opacity="0.35"/>
+
+        <Style x:Key="GlassCard" TargetType="Border">
+            <Setter Property="CornerRadius" Value="18"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="BorderBrush" Value="{StaticResource GlassBorderBrush}"/>
+            <Setter Property="Background" Value="{StaticResource CardFillBrush}"/>
+            <Setter Property="Effect" Value="{StaticResource SoftShadow}"/>
+            <Setter Property="Padding" Value="18"/>
+            <Setter Property="SnapsToDevicePixels" Value="True"/>
+        </Style>
+
+        <Style TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
+        </Style>
+
+        <Style x:Key="Caption" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+        </Style>
+
+        <Style x:Key="ValueBig" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="28"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+        </Style>
+
+        <Style x:Key="ButtonPrimary" TargetType="Button">
+            <Setter Property="Height" Value="36"/>
+            <Setter Property="Padding" Value="16,0"/>
+            <Setter Property="Background" Value="#2A2A34"/>
+            <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource GlassBorderBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border CornerRadius="12"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="#343440"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter Property="Background" Value="#24242D"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.5"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="MiniChartSurface" TargetType="Border">
+            <Setter Property="CornerRadius" Value="14"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="BorderBrush" Value="{StaticResource GlassBorderBrush}"/>
+            <Setter Property="Background" Value="{StaticResource GlassFillBrush}"/>
+            <Setter Property="Padding" Value="10"/>
+        </Style>
+
+    </Window.Resources>
+
+    <Grid>
+        <!-- Background glow -->
+        <Grid>
+            <Ellipse Width="520" Height="520" Fill="#1E5AC8FF" Opacity="0.18" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="-120,-160,0,0"/>
+            <Ellipse Width="620" Height="620" Fill="#1EFF5AC8" Opacity="0.12" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,-160,-220"/>
+            <Rectangle>
+                <Rectangle.Fill>
+                    <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                        <GradientStop Color="#101018" Offset="0"/>
+                        <GradientStop Color="#0B0B0F" Offset="1"/>
+                    </LinearGradientBrush>
+                </Rectangle.Fill>
+            </Rectangle>
+        </Grid>
+
+        <Grid Margin="22">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <!-- Header -->
+            <Grid Grid.Row="0" Margin="0,0,0,14">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <StackPanel>
+                    <TextBlock Text="Robotin tilan seuranta" FontSize="28" FontWeight="Bold"/>
+                    <TextBlock x:Name="SubTitleText" Text="Paikallinen RobotStudio (RWS)" Style="{StaticResource Caption}" Margin="0,6,0,0"/>
+                </StackPanel>
+
+                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Button x:Name="RefreshNowBtn" Content="Päivitä nyt" Style="{StaticResource ButtonPrimary}" Click="RefreshNowBtn_Click"/>
+                    <TextBlock x:Name="LastUpdateText" Margin="14,0,0,0" VerticalAlignment="Center" Foreground="{StaticResource TextSecondaryBrush}"/>
+                </StackPanel>
+            </Grid>
+
+            <!-- Status cards -->
+            <Grid Grid.Row="1" Margin="0,0,0,16">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <Border Grid.Column="0" Style="{StaticResource GlassCard}" Margin="0,0,10,0">
+                    <StackPanel>
+                        <TextBlock Text="Moottorit" Style="{StaticResource Caption}"/>
+                        <TextBlock x:Name="MotorsText" Style="{StaticResource ValueBig}" Text="Haetaan…" Margin="0,6,0,0"/>
+
+                        <TextBlock Text="Ohjelma" Style="{StaticResource Caption}" Margin="0,14,0,0"/>
+                        <TextBlock x:Name="ProgramText" Style="{StaticResource ValueBig}" Text="Haetaan…" Margin="0,6,0,0"/>
+                    </StackPanel>
+                </Border>
+
+                <Border Grid.Column="1" Style="{StaticResource GlassCard}" Margin="10,0,0,0">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Grid.Column="0" Margin="0,0,14,0">
+                            <TextBlock Text="Tarttuja" Style="{StaticResource Caption}"/>
+                            <TextBlock x:Name="GripperTextUi" FontSize="22" FontWeight="Bold" Text="Haetaan…" Margin="0,6,0,0"/>
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="1" Margin="0,0,14,0">
+                            <TextBlock Text="TCP-nopeus" Style="{StaticResource Caption}"/>
+                            <TextBlock x:Name="SpeedTextUi" FontSize="22" FontWeight="Bold" Text="Haetaan…" Margin="0,6,0,0"/>
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="2">
+                            <TextBlock Text="Sijainti (X, Y, Z)" Style="{StaticResource Caption}"/>
+                            <TextBlock x:Name="PosTextUix" FontSize="18" FontWeight="Bold" Text="Haetaan…" Margin="0,8,0,0"/>
+                            <TextBlock x:Name="PosTextUiy" FontSize="18" FontWeight="Bold" Text="Haetaan…"/>
+                            <TextBlock x:Name="PosTextUiz" FontSize="18" FontWeight="Bold" Text="Haetaan…"/>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+            </Grid>
+
+            <!-- Charts -->
+            <Grid Grid.Row="2">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <Border Grid.Column="0" Style="{StaticResource GlassCard}" Margin="0,0,10,0">
+                    <StackPanel>
+                        <TextBlock Text="Tarttuja – historia" Style="{StaticResource Caption}"/>
+                        <Border Style="{StaticResource MiniChartSurface}" Margin="0,10,0,10">
+                            <Grid>
+                                <Polyline x:Name="GripperLine" Stroke="{StaticResource TextPrimaryBrush}" StrokeThickness="2" StrokeLineJoin="Round"/>
+                            </Grid>
+                        </Border>
+                        <ListView x:Name="GripperHistoryList" Height="220" BorderThickness="0" Background="Transparent">
+                            <ListView.View>
+                                <GridView>
+                                    <GridViewColumn Header="Aika" DisplayMemberBinding="{Binding Time}" Width="90"/>
+                                    <GridViewColumn Header="Tila" DisplayMemberBinding="{Binding ValueText}" Width="150"/>
+                                </GridView>
+                            </ListView.View>
+                        </ListView>
+                    </StackPanel>
+                </Border>
+
+                <Border Grid.Column="1" Style="{StaticResource GlassCard}" Margin="10,0,10,0">
+                    <StackPanel>
+                        <TextBlock Text="TCP-nopeus – historia" Style="{StaticResource Caption}"/>
+                        <Border Style="{StaticResource MiniChartSurface}" Margin="0,10,0,10">
+                            <Grid>
+                                <Polyline x:Name="SpeedLine" Stroke="{StaticResource TextPrimaryBrush}" StrokeThickness="2" StrokeLineJoin="Round"/>
+                            </Grid>
+                        </Border>
+                        <ListView x:Name="SpeedHistoryList" Height="220" BorderThickness="0" Background="Transparent">
+                            <ListView.View>
+                                <GridView>
+                                    <GridViewColumn Header="Aika" DisplayMemberBinding="{Binding Time}" Width="90"/>
+                                    <GridViewColumn Header="Nopeus" DisplayMemberBinding="{Binding ValueText}" Width="160"/>
+                                </GridView>
+                            </ListView.View>
+                        </ListView>
+                    </StackPanel>
+                </Border>
+
+                <Border Grid.Column="2" Style="{StaticResource GlassCard}" Margin="10,0,0,0">
+                    <StackPanel>
+                        <TextBlock Text="Sijainti (X,Y,Z) – historia" Style="{StaticResource Caption}"/>
+                        <Border Style="{StaticResource MiniChartSurface}" Margin="0,10,0,10">
+                            <Grid>
+                                <Polyline x:Name="PosXLine" Stroke="{StaticResource TextPrimaryBrush}" StrokeThickness="2" StrokeLineJoin="Round"/>
+                                <Polyline x:Name="PosYLine" Stroke="{StaticResource TextSecondaryBrush}" StrokeThickness="2" StrokeLineJoin="Round"/>
+                                <Polyline x:Name="PosZLine" Stroke="#7C7C8A" StrokeThickness="2" StrokeLineJoin="Round"/>
+                            </Grid>
+                        </Border>
+                        <ListView x:Name="PosHistoryList" Height="220" BorderThickness="0" Background="Transparent">
+                            <ListView.View>
+                                <GridView>
+                                    <GridViewColumn Header="Aika" DisplayMemberBinding="{Binding Time}" Width="90"/>
+                                    <GridViewColumn Header="X" DisplayMemberBinding="{Binding X}" Width="90"/>
+                                    <GridViewColumn Header="Y" DisplayMemberBinding="{Binding Y}" Width="90"/>
+                                    <GridViewColumn Header="Z" DisplayMemberBinding="{Binding Z}" Width="90"/>
+                                </GridView>
+                            </ListView.View>
+                        </ListView>
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <TextBlock Grid.Row="3" Margin="0,16,0,0" Foreground="{StaticResource TextSecondaryBrush}"
+                       Text="Vinkki: trendit päivittyvät automaattisesti 1 s välein."/>
+        </Grid>
+    </Grid>
+</Window>
