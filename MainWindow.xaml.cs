@@ -1,53 +1,57 @@
-﻿using System;
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Net;
 using System.Net.Http;
 using System.Text.RegularExpressions;
-using System.Threading.Tasks;
 using System.Windows;
-using System.Windows.Media;
+using System.Windows.Controls;
 using System.Windows.Shapes;
 using System.Windows.Threading;
-
-// DB : SalainenSana
+using Microsoft.Data.SqlClient;
 
 namespace WpfApp1
 {
     public partial class MainWindow : Window
     {
-        // ---- RWS endpoints ----
+        // RWS-URLit
         private const string UrlCtrlState = "http://127.0.0.1:8081/rw/panel/ctrlstate/";
         private const string UrlRapidExec = "http://127.0.0.1:8081/rw/rapid/execution";
         private const string UrlRobTarget =
             "http://127.0.0.1:8081/rw/motionsystem/mechunits/ROB_1/robtarget?tool=tool0&wobj=wobj0&coordinate=Base";
 
-        // IO signals
+        // IO-signaalit
         private const string UrlTcpSpeed = "http://127.0.0.1:8081/rw/iosystem/signals/AO_TCP_SPEED?json=1";
         private const string UrlGripper = "http://127.0.0.1:8081/rw/iosystem/signals/DI_Gripper1_Closed?json=1";
 
         private const string Username = "Default User";
         private const string Password = "robotics";
 
-        // ---- HTTP ----
+        // BD-yhteys
+        private const string DbConnectionString =
+            "Server=(localdb)\\MSSQLLocalDB;Database=TeollinenInternetDB;Trusted_Connection=True;TrustServerCertificate=True;";
+
+        // HTTP-client
         private readonly HttpClient _client;
 
-        // ---- Timer ----
+        // Ajastin
         private readonly DispatcherTimer _timer = new DispatcherTimer();
         private bool _isUpdating = false;
 
-        // ---- Histories  ----
+        // Historia, max 40 pistettä
         private const int MaxPoints = 40;
 
         public ObservableCollection<HistoryItem> GripperHistory { get; } = new();
         public ObservableCollection<HistoryItem> SpeedHistory { get; } = new();
         public ObservableCollection<PosHistoryItem> PosHistory { get; } = new();
 
+        // DB -> viimeiset 5 mittausta näkymään
+        public ObservableCollection<DbMeasurement> LatestDbMeasurements { get; } = new();
+
         public MainWindow()
         {
             InitializeComponent();
 
-            // Bind lists
+            // Listat näkymään
             GripperHistoryList.ItemsSource = GripperHistory;
             SpeedHistoryList.ItemsSource = SpeedHistory;
             PosHistoryList.ItemsSource = PosHistory;
@@ -71,10 +75,17 @@ namespace WpfApp1
             SpeedTextUi.Text = "Haetaan…";
             PosTextUix.Text = "Haetaan…";
 
+            Loaded += MainWindow_Loaded;
+
             // Timer: 1s
             _timer.Interval = TimeSpan.FromSeconds(1);
             _timer.Tick += async (s, e) => await UpdateAllAsync();
             _timer.Start();
+        }
+
+        private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
+        {
+            await RefreshLatestDbMeasurementsAsync();
         }
 
         protected override void OnClosed(EventArgs e)
@@ -97,11 +108,11 @@ namespace WpfApp1
 
             try
             {
-                // 1) Motors
+                // 1) Ctrlstate -> motoron/motoroff
                 var (ctrlOk, ctrlBody, _) = await SafeGetAsync(UrlCtrlState);
                 MotorsText.Text = ctrlOk ? ToFinnishMotorState(ExtractSpan(ctrlBody, "ctrlstate")) : "Ei saatavilla";
 
-                // 2) Program
+                // 2) Ohjelman tila -> running/stopped/reset
                 var (execOk, execBody, _) = await SafeGetAsync(UrlRapidExec);
                 if (execOk)
                 {
@@ -112,18 +123,18 @@ namespace WpfApp1
                 }
                 else ProgramText.Text = "Ei saatavilla";
 
-                // 3) Gripper (0/1)
+                // 3) Tarttujan tila -> 1/0
                 var (gOk, gJson, _) = await SafeGetAsync(UrlGripper);
                 string gripRaw = gOk ? (ExtractJsonString(gJson, "lvalue") ?? ExtractJsonString(gJson, "value") ?? "") : "";
                 var gripText = ToFinnishGripper(gripRaw);
                 GripperTextUi.Text = gripText;
 
-                // 4) Speed
+                // 4) Nopeus -> numeroarvo
                 var (sOk, sJson, _) = await SafeGetAsync(UrlTcpSpeed);
                 string speedRaw = sOk ? (ExtractJsonString(sJson, "lvalue") ?? ExtractJsonString(sJson, "value") ?? "") : "";
                 SpeedTextUi.Text = FormatNum(speedRaw);
 
-                // 5) Position X,Y,Z
+                // 5) XYZ-koordinaatit
                 var (pOk, pHtml, _) = await SafeGetAsync(UrlRobTarget);
                 double? px = null, py = null, pz = null;
                 if (pOk)
@@ -136,18 +147,9 @@ namespace WpfApp1
                     py = TryParseInvariant(y);
                     pz = TryParseInvariant(z);
 
-                    PosTextUix.Text = (x != null)
-                        ? $"X: {FormatNum(x)}"
-                        : "Ei saatavilla";
-
-                    PosTextUiy.Text = (y != null)
-                        ? $"Y: {FormatNum(y)}"
-                        : "Ei saatavilla";
-
-                    PosTextUiz.Text = (z != null)
-                        ? $"Z: {FormatNum(z)}"
-                        : "Ei saatavilla";
-
+                    PosTextUix.Text = (x != null) ? $"X: {FormatNum(x)}" : "Ei saatavilla";
+                    PosTextUiy.Text = (y != null) ? $"Y: {FormatNum(y)}" : "Ei saatavilla";
+                    PosTextUiz.Text = (z != null) ? $"Z: {FormatNum(z)}" : "Ei saatavilla";
                 }
                 else
                 {
@@ -156,27 +158,25 @@ namespace WpfApp1
                     PosTextUiz.Text = "Ei saatavilla";
                 }
 
-                // ---- Add history points ----
+                // historiaan ja chartteihin
                 var time = DateTime.Now.ToString("HH:mm:ss");
 
-                // Gripper history (0/1)
                 if (TryParseInvariant(gripRaw) is double gv)
                 {
                     PushHistory(GripperHistory, new HistoryItem(time, gripText, gv));
                     DrawLineChart(GripperLine, GripperHistory, 110, normalize01: true);
                 }
 
-                // Speed history
                 if (TryParseInvariant(speedRaw) is double sv)
                 {
                     PushHistory(SpeedHistory, new HistoryItem(time, FormatNum(speedRaw), sv));
                     DrawLineChart(SpeedLine, SpeedHistory, 110, normalize01: false);
                 }
 
-                // Position history
                 if (px.HasValue && py.HasValue && pz.HasValue)
                 {
-                    PushPosHistory(PosHistory, new PosHistoryItem(time,
+                    PushPosHistory(PosHistory, new PosHistoryItem(
+                        time,
                         FormatNum(px.Value.ToString(CultureInfo.InvariantCulture)),
                         FormatNum(py.Value.ToString(CultureInfo.InvariantCulture)),
                         FormatNum(pz.Value.ToString(CultureInfo.InvariantCulture)),
@@ -185,11 +185,23 @@ namespace WpfApp1
                     DrawTripleChart(PosXLine, PosYLine, PosZLine, PosHistory, 110);
                 }
 
+                // DB-> tallenna mittaus
+                bool? gripperBit = gripRaw.Trim() switch
+                {
+                    "1" => true,
+                    "0" => false,
+                    _ => null
+                };
+                double? tcpSpeed = TryParseInvariant(speedRaw);
+                await SaveMeasurementAsync(gripperBit, tcpSpeed, px, py, pz);
+
+                // DB -> päivitä 5 viimeisinta
+                await RefreshLatestDbMeasurementsAsync();
+
                 LastUpdateText.Text = $"Päivitetty: {DateTime.Now:HH:mm:ss}";
             }
             catch (Exception ex)
             {
-                // Älä kaada UI:ta, näytä yleinen virhe
                 SubTitleText.Text = ex.Message;
             }
             finally
@@ -199,7 +211,78 @@ namespace WpfApp1
             }
         }
 
-        // ----------------- Helpers -----------------
+        // Tietokanta
+
+        private void BindDbListIfExists()
+        {
+            var list = FindName("DbLatestList") as ListView;
+            if (list != null) list.ItemsSource = LatestDbMeasurements;
+        }
+
+        private async Task SaveMeasurementAsync(bool? gripper, double? tcpSpeed, double? posX, double? posY, double? posZ)
+        {
+            try
+            {
+                await using var con = new SqlConnection(DbConnectionString);
+                await con.OpenAsync();
+
+                const string sql = @"
+                    INSERT INTO [TeollinenInternetDB].[dbo].[measurements] (gripper, tcp_speed, pos_x, pos_y, pos_z)
+                    VALUES (@gripper, @tcp_speed, @pos_x, @pos_y, @pos_z);";
+
+                await using var cmd = new SqlCommand(sql, con);
+                cmd.Parameters.AddWithValue("@gripper", (object?)gripper ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@tcp_speed", (object?)tcpSpeed ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@pos_x", (object?)posX ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@pos_y", (object?)posY ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@pos_z", (object?)posZ ?? DBNull.Value);
+
+                await cmd.ExecuteNonQueryAsync();
+            }
+            catch (Exception ex)
+            {
+                SubTitleText.Text = $"DB-virhe: {ex.Message}";
+            }
+        }
+
+        private async Task RefreshLatestDbMeasurementsAsync()
+        {
+            try
+            {
+                await using var con = new SqlConnection(DbConnectionString);
+                await con.OpenAsync();
+
+                const string sql = @"
+                    SELECT TOP (5) measured_at, gripper, tcp_speed, pos_x, pos_y, pos_z
+                    FROM [TeollinenInternetDB].[dbo].[measurements]
+                    ORDER BY measured_at DESC;";
+
+                await using var cmd = new SqlCommand(sql, con);
+                await using var r = await cmd.ExecuteReaderAsync();
+
+                var rows = new List<DbMeasurement>();
+                while (await r.ReadAsync())
+                {
+                    rows.Add(new DbMeasurement(
+                        measuredAt: r.GetDateTime(0),
+                        gripper: r.IsDBNull(1) ? null : r.GetBoolean(1),
+                        tcpSpeed: r.IsDBNull(2) ? null : r.GetDouble(2),
+                        posX: r.IsDBNull(3) ? null : r.GetDouble(3),
+                        posY: r.IsDBNull(4) ? null : r.GetDouble(4),
+                        posZ: r.IsDBNull(5) ? null : r.GetDouble(5)
+                    ));
+                }
+
+                LatestDbMeasurements.Clear();
+                foreach (var row in rows) LatestDbMeasurements.Add(row);
+            }
+            catch (Exception ex)
+            {
+                SubTitleText.Text = $"DB-lukuvirhe: {ex.Message}";
+            }
+        }
+
+        // Helper-funktiot
 
         private async Task<(bool ok, string body, string err)> SafeGetAsync(string url)
         {
@@ -277,11 +360,11 @@ namespace WpfApp1
                 _ => raw
             };
 
-        // ----------------- History + Charts -----------------
+        // historia + chart helperit
 
         private static void PushHistory(ObservableCollection<HistoryItem> list, HistoryItem item)
         {
-            list.Insert(0, item);                // newest on top
+            list.Insert(0, item);
             while (list.Count > MaxPoints) list.RemoveAt(list.Count - 1);
         }
 
@@ -296,11 +379,9 @@ namespace WpfApp1
             poly.Points.Clear();
             if (data.Count < 2) return;
 
-            // newest at index 0 -> draw left-to-right oldest->newest
             int n = data.Count;
-            double width = 320; // arbitrary; WPF scales fine visually here
+            double width = 320;
 
-            // find min/max
             double min = double.PositiveInfinity, max = double.NegativeInfinity;
             for (int i = n - 1; i >= 0; i--)
             {
@@ -313,6 +394,7 @@ namespace WpfApp1
                 if (v < min) min = v;
                 if (v > max) max = v;
             }
+
             if (double.IsInfinity(min) || double.IsInfinity(max) || Math.Abs(max - min) < 1e-9)
             {
                 min -= 1;
@@ -340,7 +422,6 @@ namespace WpfApp1
             int n = data.Count;
             double width = 320;
 
-            // min/max across all three for nice scale
             double min = double.PositiveInfinity, max = double.NegativeInfinity;
             for (int i = n - 1; i >= 0; i--)
             {
@@ -352,7 +433,6 @@ namespace WpfApp1
             for (int i = n - 1; i >= 0; i--)
             {
                 double x = (n - 1 - i) * (width / (n - 1));
-
                 xLine.Points.Add(new Point(x, YOf(data[i].XN)));
                 yLine.Points.Add(new Point(x, YOf(data[i].YN)));
                 zLine.Points.Add(new Point(x, YOf(data[i].ZN)));
@@ -386,4 +466,14 @@ namespace WpfApp1
             XN = xn; YN = yn; ZN = zn;
         }
     }
+
+    // DB->  malli mittauksille
+    public record DbMeasurement(
+        DateTime measuredAt,
+        bool? gripper,
+        double? tcpSpeed,
+        double? posX,
+        double? posY,
+        double? posZ
+    );
 }

@@ -238,8 +238,7 @@
                 </Border>
             </Grid>
 
-            <TextBlock Grid.Row="3" Margin="0,16,0,0" Foreground="{StaticResource TextSecondaryBrush}"
-                       Text="Vinkki: trendit päivittyvät automaattisesti 1 s välein."/>
+            <TextBlock Grid.Row="3" Margin="0,16,0,0" Foreground="{StaticResource TextSecondaryBrush}"/>
         </Grid>
     </Grid>
 </Window>
