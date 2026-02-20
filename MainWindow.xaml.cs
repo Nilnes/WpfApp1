@@ -19,16 +19,16 @@ namespace WpfApp1
         private const string UrlRobTarget =
             "http://127.0.0.1:8081/rw/motionsystem/mechunits/ROB_1/robtarget?tool=tool0&wobj=wobj0&coordinate=Base";
 
+        // BD-yhteys
+        private const string DbConnectionString =
+            "Server=(localdb)\\MSSQLLocalDB;Database=TeollinenInternetDB;Trusted_Connection=True;TrustServerCertificate=True;";
+
         // IO-signaalit
         private const string UrlTcpSpeed = "http://127.0.0.1:8081/rw/iosystem/signals/AO_TCP_SPEED?json=1";
         private const string UrlGripper = "http://127.0.0.1:8081/rw/iosystem/signals/DI_Gripper1_Closed?json=1";
 
         private const string Username = "Default User";
         private const string Password = "robotics";
-
-        // BD-yhteys
-        private const string DbConnectionString =
-            "Server=(localdb)\\MSSQLLocalDB;Database=TeollinenInternetDB;Trusted_Connection=True;TrustServerCertificate=True;";
 
         // HTTP-client
         private readonly HttpClient _client;
@@ -77,7 +77,7 @@ namespace WpfApp1
 
             Loaded += MainWindow_Loaded;
 
-            // Timer: 1s
+            // Ajastin: 1s
             _timer.Interval = TimeSpan.FromSeconds(1);
             _timer.Tick += async (s, e) => await UpdateAllAsync();
             _timer.Start();
@@ -212,12 +212,6 @@ namespace WpfApp1
         }
 
         // Tietokanta
-
-        private void BindDbListIfExists()
-        {
-            var list = FindName("DbLatestList") as ListView;
-            if (list != null) list.ItemsSource = LatestDbMeasurements;
-        }
 
         private async Task SaveMeasurementAsync(bool? gripper, double? tcpSpeed, double? posX, double? posY, double? posZ)
         {
