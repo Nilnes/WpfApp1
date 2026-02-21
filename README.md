@@ -29,10 +29,10 @@ Sovelluksen avulla voit seurata esimerkiksi:
 
 ## Miten se toimii
 
-Sovellus suorittaa jatkuvaa päivityssykliä (esim. 1 Hz):
+Sovellus suorittaa jatkuvaa päivityssykliä:
 
 1. Hakee tilatiedot RobotStudion RWS-endpointeista (HTTP/JSON)
-2. Päivittää käyttöliittymän (kentät, listat ja mahdollinen trendikuvaaja)
+2. Päivittää käyttöliittymän
 3. Tallentaa mittauksen tietokantaan aikaleiman kanssa
 
 Trendikuvaaja voidaan piirtää WPF:n Polyline-elementillä: arvot skaalataan piirtoalueen koordinaatteihin (min/max -> ruudun koko).
@@ -49,9 +49,8 @@ Trendikuvaaja voidaan piirtää WPF:n Polyline-elementillä: arvot skaalataan pi
 
 ## Esivaatimukset
 
-Varmista, että koneeltasi löytyy:
 - Visual Studio 2022 (tai uudempi) ja .NET 8 SDK
-- SQL Server LocalDB (yleensä Visual Studion mukana)
+- SQL Server LocalDB (Visual Studion sisällä)
 - ABB RobotStudio, jossa RWS-rajapinta on aktiivinen
 
 ---
@@ -64,8 +63,8 @@ Varmista, että koneeltasi löytyy:
 
 ### 2) RobotStudion tarkistus
 - Varmista, että RobotStudio on käynnissä
-- Varmista, että RWS on käytössä
-- Sovellus voi olettaa robotin löytyvän osoitteesta `http://127.0.0.1:8081` (muuta tämä, jos ympäristösi on eri)
+- Varmista, että RWS on käytössä ja kuuntelee porttia 8081
+- Sovellus olettaa robotin löytyvän osoitteesta `http://127.0.0.1:8081`
 
 ### 3) Käynnistä sovellus
 - Paina F5 ja tarkista, että data alkaa päivittyä käyttöliittymään
@@ -110,27 +109,23 @@ GO
 
 Sovellus hakee dataa RobotStudion RWS-rajapinnan kautta. Jos robotti/RobotStudio ei ole oletusosoitteessa, muuta osoite sovelluksen asetuksiin/koodiin.
 
-- Oletus (esimerkki): `http://127.0.0.1:8081`
+- Oletus: `http://127.0.0.1:8081`
 
 Varmista myös, että RobotStudion asetukset ja palomuuri sallivat yhteyden.
 
 ### Connection String
 
-Tarkista `MainWindow.xaml.cs` (tai se tiedosto/luokka, jossa tietokantayhteys tehdään), ja varmista että connection string osoittaa SQL Server LocalDB:hen.
+Tarkista `MainWindow.xaml.cs`, ja varmista että connection string osoittaa SQL Server LocalDB:hen.
 
-Hyvä uutinen: jos joskus siirrytte “oikeaan” SQL Serveriin, yleensä riittää connection stringin vaihtaminen (koodi voi pysyä muuten samana).
-
-### Päivitysnopeus (polling)
-
-Jos päivitystahti (esim. 1 Hz) on kovakoodattu, sen voi myöhemmin siirtää konfiguraatioon. Tyypillisesti päivitys tehdään ajastimella ja UI päivitetään Dispatcher-kontekstissa.
+Jos siirrytään "oikeaan" SQL Serveriin, connection stringin vaihtaminen riittää ja koodi voi pysyy muuten samana.
 
 ---
 
 ## Käyttö
 
-- Sovellus päivittää näkymän automaattisesti (esim. kerran sekunnissa)
-- Viimeisimmät mittauspisteet näkyvät listassa / kentissä (toteutuksesta riippuen)
-- Trendi näyttää mittausten kehityksen ajan suhteen (jos toteutettu)
+- Sovellus päivittää näkymän automaattisesti kerran sekunnissa
+- Viimeisimmät mittauspisteet näkyvät listassa / kentissä
+- Trendi näyttää mittausten kehityksen ajan suhteen
 - Mittaukset tallentuvat tietokantaan (aikaleima + arvot)
 
 ---
@@ -143,15 +138,11 @@ Jos päivitystahti (esim. 1 Hz) on kovakoodattu, sen voi myöhemmin siirtää ko
 - Endpoint / portti on väärin (esim. 8081)
 - RobotStudion asetukset eivät salli RWS-yhteyttä
 
-### Sovellus kaatuu tai UI ei päivity
-- Tarkista lokit / Visual Studion Output-ikkuna
-- Varmista, että verkkohaut eivät blokkaa UI-säiettä (tarvittaessa taustasäie + Dispatcher UI-päivitykseen)
-
 ### Tietokantaan ei tallennu
 - LocalDB puuttuu tai ei ole käynnissä
 - Connection string on väärin
 - Taulua ei ole luotu (aja SQL-skripti)
-- Sovelluksella ei ole oikeuksia luoda/yhdistää tietokantaan (harvinaista LocalDB:llä, mutta mahdollista)
+- Sovelluksella ei ole oikeuksia luoda/yhdistää tietokantaan
 
 ---
 
@@ -159,7 +150,7 @@ Jos päivitystahti (esim. 1 Hz) on kovakoodattu, sen voi myöhemmin siirtää ko
 
 Tämä on projektin ensimmäinen vaihe, ja siinä on muutamia tyypillisiä jatkokehityskohtia:
 
-- Kovat koodatut asetukset -> erillinen konfiguraatio (esim. appsettings.json)
+- Kovakoodatut asetukset -> erillinen konfiguraatio (esim. appsettings.json)
 - Historiadatan näkymä -> suora haku tietokannasta ja suodatus aikavälillä
 - Rinnakkaisuus -> datan haku taustalla, UI-päivitys Dispatcherilla
 - Tekoäly apuna kehityksessä -> koodi on tuotettu osittain tekoälyn avulla ja sitä on käytetty erityisesti UI-ratkaisujen ja ongelmanratkaisun ideointiin
